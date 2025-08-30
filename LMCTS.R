@@ -1,115 +1,127 @@
-library(MASS)
-
 # Parameters
-T <- 10000     
-K <- 5
-d <- 20
-d_context <- 4
-sigma <- 0.5
-sigma0 <- 0.01
+T <- 10000          
+K <- 5              
+d_context <- 4      
+d <- K * d_context  
 
-# LMC hyperparameters
+sigma0 <- 0.01   # prior std
+sigma <- 0.5     # noise std
+
+# FG / LMC hyperparameters
 h <- 1e-6
+eta <- 1.0
 beta <- 1.0
-K_lmc <- 20
+K_lmc <- 20      
+lambda_fg <- 0.5
+b_cap <- 1000
 
 set.seed(123)
 
-# True parameter vector
+# true parameter vector
 theta_star <- rnorm(d, mean = 0, sd = sigma0)
 
 # Feature map
-phi <- function(X, i) {
-  if (length(i) == 0 || i < 1 || i > K) stop("Invalid arm index in phi()")
+phi_map <- function(X, a) 
+{
   vec <- rep(0, d)
-  start_idx <- (i - 1) * d_context + 1
-  end_idx <- start_idx + d_context - 1
-  vec[start_idx:end_idx] <- X
+  st <- (a - 1) * d_context + 1
+  end_idx <- st + d_context - 1
+  vec[st:end_idx] <- X
   return(vec)
 }
 
 # Storage
 regrets <- numeric(T)
-param_error <- numeric(T)     # posterior convergence measure
-pred_error <- numeric(T)      # prediction accuracy measure
+chosen_arms <- integer(T)
+optimal_arms <- integer(T)
+errors1 <- numeric(T)
 
-# Data storage
-X_hist <- list()
-r_hist <- c()
+theta_curr <- rep(0, d)   
 
-# Initialize theta
-theta_curr <- rep(0, d)
+# Accumulators
+A <- matrix(0, d, d)   # sum φφᵀ
+b_vec <- rep(0, d)     # sum φ r
+Phi_list <- list()     # keep past φ's (for FG term only)
 
-for (t in 1:T) {
-  X_t <- rnorm(d_context, mean = 0, sd = 1)
+# Gradient function (efficient)
+grad_loss_fg <- function(theta) 
+{
+  grad_prior <- theta / (sigma0^2)
+  grad_sqerr <- 2 * eta * (A %*% theta - b_vec)
   
-  # Gradient of neg log posterior
-  grad_loss <- function(theta) {
-    grad <- theta / (sigma0^2)
-    if (length(r_hist) > 0) {
-      for (s in 1:length(r_hist)) {
-        phi_s <- X_hist[[s]]
-        err <- sum(phi_s * theta) - r_hist[s]
-        grad <- grad + (1 / sigma^2) * phi_s * err
-      }
-    }
-    return(grad)
+  grad_fg <- rep(0, d)
+  if (length(Phi_list) > 0) 
+  {
+    # stack phi's once (matrix form)
+    Phi_mat <- do.call(rbind, Phi_list)
+    preds <- Phi_mat %*% theta
+    mask <- as.numeric(preds < b_cap)
+    grad_fg <- lambda_fg * colSums(Phi_mat * mask)
   }
   
+  return(drop(grad_prior + grad_sqerr - grad_fg))
+}
+
+for (t in 1:T) 
+{
+  # Context
+  X_t <- rnorm(d_context, mean = 0, sd = 1)
+  
   # LMC updates
-  for (k in 1:K_lmc) {
-    noise <- rnorm(d, mean = 0, sd = 1)
-    theta_curr <- theta_curr - h * grad_loss(theta_curr) + sqrt(2 * h / beta) * noise
+  for (k in 1:K_lmc) 
+  {
+    noise <- rnorm(d)
+    theta_curr <- theta_curr - h * grad_loss_fg(theta_curr) + sqrt(2 * h / beta) * noise
   }
   
   # Action selection
-  pred_rewards <- sapply(1:K, function(a) sum(phi(X_t, a) * theta_curr))
+  pred_rewards <- sapply(1:K, function(a) sum(phi_map(X_t, a) * theta_curr))
   a_t <- which.max(pred_rewards)
+  chosen_arms[t] <- a_t
   
   # Reward
   eps_t <- rnorm(1, mean = 0, sd = sigma)
-  r_t <- sum(phi(X_t, a_t) * theta_star) + eps_t
+  phi_t <- phi_map(X_t, a_t)
+  r_t <- sum(phi_t * theta_star) + eps_t
   
   # Optimal reward
-  opt_rewards <- sapply(1:K, function(a) sum(phi(X_t, a) * theta_star))
+  opt_rewards <- sapply(1:K, function(a) sum(phi_map(X_t, a) * theta_star))
+  opt_arm <- which.max(opt_rewards)
+  optimal_arms[t] <- opt_arm
   r_star_t <- max(opt_rewards)
   
-  regrets[t] <- r_star_t - sum(phi(X_t, a_t) * theta_star)
+  # Regret
+  regrets[t] <- r_star_t - sum(phi_map(X_t, a_t) * theta_star)
   
-  # Store data
-  X_hist[[length(X_hist) + 1]] <- phi(X_t, a_t)
-  r_hist <- c(r_hist, r_t)
+  # Update accumulators
+  A <- A + tcrossprod(phi_t)
+  b_vec <- b_vec + phi_t * r_t
+  Phi_list[[length(Phi_list) + 1]] <- phi_t  # keep φ for FG term
   
-  # --- New diagnostics ---
-  
-  # Posterior convergence (Euclidean distance between theta_curr and theta_star)
-  param_error[t] <- sqrt(sum((theta_curr - theta_star)^2))
-  
-  # Prediction accuracy: average squared error on past history
-  if (length(r_hist) > 0) {
-    pred_error[t] <- mean(sapply(1:length(r_hist), function(s) {
-      (sum(X_hist[[s]] * theta_curr) - sum(X_hist[[s]] * theta_star))^2
-    }))
-  } else {
-    pred_error[t] <- NA
-  }
+  # Error
+  errors1[t] <- sqrt(sum((theta_curr - theta_star)^2))
 }
 
+# Evaluation
 cumulative_regret <- cumsum(regrets)
-
 cat(sprintf("Final cumulative regret: %.2f\n", cumulative_regret[T]))
 
-# --- Plots ---
-plot(cumulative_regret, type="l", col="blue", 
-     main="Cumulative Regret", xlab="Round", ylab="Regret")
+cat("\nArm selection frequencies:\n")
+print(table(chosen_arms))
+barplot(table(chosen_arms), col="purple",
+        main="Histogram of Chosen Arms",
+        xlab="Arm", ylab="Number of times selected")
 
-plot(param_error, type="l", col="red", 
-     main="Posterior Convergence of Parameters", 
-     xlab="Round", ylab="||theta_curr - theta_star||2")
+accuracy <- mean(chosen_arms == optimal_arms)
+cat(sprintf("\nAccuracy of optimal arm selection: %.2f%%\n", 100 * accuracy))
 
-plot(pred_error, type="l", col="darkgreen", 
-     main="Prediction Accuracy (MSE)", 
-     xlab="Round", ylab="Prediction Error")
+plot(errors1, type = "l", main = "Convergence of θ_hat to θ*",
+     xlab = "Round", ylab = "||θ_hat - θ*||2")
 
-table_chosen <- table(sapply(1:T, function(t) which.max(sapply(1:K, function(a) sum(phi(rnorm(d_context), a) * theta_curr)))))
+plot(cumulative_regret, type = "l", main = "Cumulative Regret",
+     xlab = "Round", ylab = "Regret")
 
+optimal_fraction <- cumsum(chosen_arms == optimal_arms) / (1:T)
+plot(optimal_fraction, type = "l", col = "blue",
+     main = "Fraction of Optimal Arm Selections",
+     xlab = "Round", ylab = "Fraction")
