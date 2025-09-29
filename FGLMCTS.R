@@ -124,5 +124,6 @@ plot(cumulative_regret, type = "l", main = "Cumulative Regret",
 optimal_fraction <- cumsum(chosen_arms == optimal_arms) / (1:T)
 plot(optimal_fraction, type = "l", col = "blue",
      main = "Fraction of Optimal Arm Selections",
+     ylim = c(0,1),
      xlab = "Round", ylab = "Fraction")
 
