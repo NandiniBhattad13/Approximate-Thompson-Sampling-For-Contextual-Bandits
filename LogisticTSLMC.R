@@ -53,7 +53,7 @@ h <- 1e-5      # Step size
 beta <- 1.0     # Inverse temperature
 K_lmc <- 20     # Number of LMC steps per round
 
-set.seed(42)
+set.seed(123)
 
 # True parameter vector
 theta_star <- rnorm(d_context, mean = 0, sd = 1)
