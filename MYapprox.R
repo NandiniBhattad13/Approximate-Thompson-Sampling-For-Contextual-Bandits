@@ -9,7 +9,7 @@ sigma  <- 0.5
 
 # FG / LMC hyperparameters
 h <- 1e-6
-eta <- 1.0
+eta <- 1/(sigma^2)
 beta <- 1.0
 K_lmc <- 20      
 lambda_fg <- 0.5
