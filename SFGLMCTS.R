@@ -18,7 +18,7 @@ lambda_sfg <- 0.5
 b_cap      <- 1000
 s_param    <- 5.0
 
-
+set.seed(123)
 phi_map <- function(X, a) 
 {
   vec <- rep(0, d)
