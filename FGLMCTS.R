@@ -9,7 +9,7 @@ sigma <- 0.5     # noise std
 
 # FG / LMC hyperparameters
 h <- 1e-6
-eta <- 1.0
+eta <- 1/(sigma^2)
 beta <- 1.0
 K_lmc <- 20      
 lambda_fg <- 0.5
@@ -47,7 +47,7 @@ Phi_list <- list()     # keep past φ's (for FG term only)
 grad_loss_fg <- function(theta) 
 {
   grad_prior <- theta / (sigma0^2)
-  grad_sqerr <- 2 * eta * (A %*% theta - b_vec)
+  grad_sqerr <- eta * (A %*% theta - b_vec)
   
   grad_fg <- rep(0, d)
   if (length(Phi_list) > 0) 
