@@ -43,7 +43,7 @@ grad_my_envelope <- function(x, a, lam)
 grad_loss_myfg <- function(theta) 
 {
   grad_prior <- theta / (sigma0^2)
-  grad_sqerr <- 2 * eta * (A %*% theta - b_vec)
+  grad_sqerr <- eta * (A %*% theta - b_vec)
   
   grad_fg <- rep(0, d)
   if (length(Phi_list) > 0) 
