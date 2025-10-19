@@ -13,7 +13,7 @@ beta  <- 1.0
 K_lmc <- 20
 
 # SFG hyperparameters
-eta        <- 1.0
+eta        <- 1/(sigma^2)
 lambda_sfg <- 0.5
 b_cap      <- 1000
 s_param    <- 5.0
@@ -37,7 +37,7 @@ sigmoid_stable <- function(z)
 grad_loss_sfg <- function(theta, A, b, ctx)
 {
   grad_prior <- theta / (sigma0^2)
-  grad_sqerr <- if (sum(A) > 0) 2 * eta * (A %*% theta - b) else rep(0, d)
+  grad_sqerr <- if (sum(A) > 0) eta * (A %*% theta - b) else rep(0, d)
   # SFG term (only depends on current context)
   vals <- sapply(1:K, function(a) sum(phi_map(ctx, a) * theta))
   a_star <- which.max(vals)
