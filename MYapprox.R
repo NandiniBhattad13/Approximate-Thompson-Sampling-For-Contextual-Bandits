@@ -1,14 +1,14 @@
 # Parameters
-T <- 10000          
+T <- 10000      
 K <- 5              
 d_context <- 4      
 d <- K * d_context  
 
-sigma0 <- 0.01
-sigma  <- 0.5
+sigma0 <- 0.5
+sigma  <- 1
 
 # FG / LMC hyperparameters
-h <- 1e-6
+h <- 1e-4
 eta <- 1/(sigma^2)
 beta <- 1.0
 K_lmc <- 20      
@@ -17,7 +17,7 @@ b_cap <- 0.5
 lambda_my <- 5.0   # smoothing parameter for Moreau–Yosida approx
 
 set.seed(123)
-theta_star <- rnorm(d, mean = 0, sd = sigma0)
+theta_star <- c(rep(5, 4), rnorm(d - 4, mean = 2, sd = sigma0))
 
 # feature map
 phi_map <- function(X, a) 
@@ -112,11 +112,11 @@ barplot(table(chosen_arms), col="purple",
         main="Histogram of Chosen Arms",
         xlab="Arm", ylab="Number of times selected")
 
-accuracy <- mean(chosen_arms == optimal_arms)
+accuracy <- mean(chosen_arms == optimal_arms) 
 cat(sprintf("\nAccuracy of optimal arm selection: %.2f%%\n", 100 * accuracy))
 
 plot(errors1, type="l", main="Convergence of θ̂ to θ*",
-     xlab="Round", ylab="||θ̂−θ*||₂")
+     xlab="Round", ylab="||θ̂−θ*||^2")
 
 plot(cumulative_regret, type="l", main="Cumulative Regret",
      xlab="Round", ylab="Regret")
