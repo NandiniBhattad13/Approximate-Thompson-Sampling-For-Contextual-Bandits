@@ -1,5 +1,5 @@
 # Parameters
-T <- 10000      
+T <- 1000
 K <- 5              
 d_context <- 4      
 d <- K * d_context  
@@ -8,12 +8,12 @@ sigma0 <- 0.5
 sigma  <- 1
 
 # FG / Barker hyperparameters
-h <- 1e-2
+h <- .1
 eta <- 1/(sigma^2)
-K_barker <- 200      
+K_barker <- 1      
 lambda_fg <- 0.5
 b_cap <- 0.5
-lambda_my <- 5.0   # smoothing parameter for Moreau–Yosida approx
+lambda_my <- .1   # smoothing parameter for Moreau–Yosida approx
 
 set.seed(123)
 theta_star <- c(rep(5, 4), rnorm(d - 4, mean = 2, sd = sigma0))
@@ -57,6 +57,7 @@ grad_loss_myfg <- function(theta)
   drop(grad_prior + grad_sqerr + grad_fg)
 }
 
+
 # storage
 regrets <- numeric(T)
 chosen_arms <- integer(T)
@@ -77,7 +78,7 @@ for (t in 1:T)
   {
     grad_curr <- grad_loss_myfg(theta_curr)
     w <- rnorm(d, 0, h)
-    p <- plogis(0.5 * grad_curr * w)
+    p <- plogis(-0.5 * grad_curr * w)
     b <- ifelse(runif(d) < p, 1, -1)
     theta_curr <- theta_curr + b * w
   }
